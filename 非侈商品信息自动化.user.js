@@ -4,8 +4,8 @@
 // @author       kinrt
 // @description  复制宝贝数据，快速复制各种信息，打开常用页面等。
 // @namespace    https://github.com/kinrt/userScript
-// @updateURL    https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
-// @downloadURL  https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
+// @updateURL    https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.user.js
+// @downloadURL  https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.user.js
 
 // @include      https://*.taobao.com/*
 // @include      https://*.tmall.com/*
