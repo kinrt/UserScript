@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         淘宝工作辅助
-// @namespace    http://tampermonkey.net/
-// @version      20250519
-// @updateURL    https://greasyfork.org/scripts/439061-%E6%B7%98%E5%AE%9D%E5%B7%A5%E4%BD%9C%E8%BE%85%E5%8A%A9/code/%E6%B7%98%E5%AE%9D%E5%B7%A5%E4%BD%9C%E8%BE%85%E5%8A%A9.user.js
+// @version      20250520
+// @namespace    https://github.com/kinrt/userScript
+// @updateURL    https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
+// @downloadURL  https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
 // @description  在淘宝后台自动打开隐私信息，复制已售出的宝贝。根据价格分类显示不同和颜色，0库存红字显示，一键复制0库存颜色分类名称。淘宝详情页面颜色分类有图片的时候显示文字，并给子账号新增编辑按钮，快速复制当前选择的SKU信息。
 // @author       kinrt
 // @include      https://*.taobao.com/*
@@ -25,7 +26,7 @@
 // @connect      oapi.dingtalk.com
 // ==/UserScript==
 
-// https://greasyfork.org/zh-CN/scripts/439061/versions/new
+// https://github.com/kinrt/userScript
 
 // 全局日志等级，默认为 10（debug）
 let debugLevel = 20;
