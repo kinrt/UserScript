@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         淘宝工作辅助
-// @version      20250520
+// @version      20250521
+// @author       kinrt
+// @description  复制已售出的数据，复制宝贝数据，0库存改变颜色提醒，宝贝发布页面功能增强。快速复制各种信息，打开常用页面等。
 // @namespace    https://github.com/kinrt/userScript
 // @updateURL    https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
 // @downloadURL  https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
-// @description  在淘宝后台自动打开隐私信息，复制已售出的宝贝。根据价格分类显示不同和颜色，0库存红字显示，一键复制0库存颜色分类名称。淘宝详情页面颜色分类有图片的时候显示文字，并给子账号新增编辑按钮，快速复制当前选择的SKU信息。
-// @author       kinrt
+
 // @include      https://*.taobao.com/*
 // @include      https://*.tmall.com/*
 // @include      https://*.1688.com/*
@@ -92,6 +93,55 @@ function debug(data, level = LOG_LEVELS.INFO) {
     console.groupEnd();
 }
 
+function logPrint(logStr, level = 20, autoClose = 3) {
+    debug(logStr, level);
+    if(level < debugLevel){
+        return 0;
+    }
+    var div = document.getElementById("logPrint")
+    if (div == null) {
+        div = document.createElement("div");
+        div.id = "logPrint";
+        div.className = "container";
+    } else {
+        div.style.left = "50%";
+    }
+    if (level == 10) {
+        div.className = "alert alert-success alert-dismissible";
+    } else if (level == 20) {
+        div.className = "alert alert-info alert-dismissible";
+    } else if (level == 30) {
+        div.className = "alert alert-warning alert-dismissible";
+    } else if (level == 40) {
+        div.className = "alert alert-danger alert-dismissible";
+    } else {
+        div.className = "alert alert-primary alert-dismissible";
+    }
+    div.innerHTML = '<button onclick="this.parentNode.remove()" type="button" class="close" data-dismiss="alert">&times;</button>' + logStr;
+    document.body.append(div);
+    div.style.left = (div.offsetLeft - div.offsetWidth / 2) + "px";
+    if (autoClose) {
+        setTimeout(function () { div.style = "top:100%; opacity:0; transition: all 0.3s;"; }, autoClose * 1000);
+        setTimeout(function () { div.remove(); }, autoClose * 1000 + 300);
+    }
+}
+
+function sendMsg(data) {
+    var TextMsg = "{'msgtype': 'text','text': {'content': 'textMsg'}}";
+    TextMsg = TextMsg.replace("textMsg", data);
+    GM_xmlhttpRequest({
+        method: "POST",
+        url: globalUserData["url"],
+        data: TextMsg,
+        headers: {
+            "Content-Type": "application/json ;charset=gbk "
+        },
+        onload: function (response) {
+            debug(response.responseText, 20)
+        }
+    });
+}
+
 var colorList = Array();
 function getColor(index, num) {
     if (colorList.length == 0) {
@@ -141,6 +191,76 @@ function toTable(data) {
     return dataStr;
 }
 
+function toText(data) {
+    var dataStr = "";
+    for (var rowi = 0; rowi < data.length; rowi++) {
+        for (var coli = 0; coli < data[rowi].length; coli++) {
+            var tmp = String(data[rowi][coli]).replace('"', '""');
+            if (tmp.indexOf(",") >= 0 || tmp.indexOf('"') >= 0 || tmp.indexOf("\n") >= 0 || tmp.indexOf("\t") >= 0) {
+                tmp = '"' + tmp + '"';
+            }
+            dataStr += tmp + "\t";
+        }
+        dataStr = dataStr.trimEnd() + "\n";
+    }
+    return dataStr.trimEnd();
+}
+
+// 查找父元素
+function findParentElementWithClass(element, targetClass) {
+    while (element && element !== document) {
+        if (element.classList && element.classList.contains(targetClass)) {
+            return element;
+        }
+        element = element.parentElement;
+    }
+    return null;
+}
+
+// 查找第一个元素
+function findFirstChildElement(element) {
+    while (element && element !== document) {
+        var firstChildElement = element.firstElementChild;
+        if (firstChildElement) {
+            element = firstChildElement;
+        } else {
+            return element;
+        }
+    }
+    return null;
+}
+
+// 等到指定元素后点击
+function waitClick(cssStr, newCssStr, timeOut = 2000) {
+    var begin = 0;
+    var interval = 200;
+    var intervalId = setInterval(function () {
+        if (typeof (newCssStr) == 'string') {
+            var node = document.querySelector(newCssStr);
+        } else {
+            var node = newCssStr;
+        }
+        if (node != null) {
+            clearInterval(intervalId);
+            return true;
+        } else {
+            if (typeof (cssStr) == 'string') {
+                var node = document.querySelector(cssStr);
+            } else {
+                var node = cssStr;
+            }
+            if (node != null) {
+                node.click();
+            }
+        }
+        begin += interval;
+        if (begin >= timeOut) {
+            clearInterval(intervalId);
+            return false;
+        }
+    }, interval)
+}
+
 function insetrCopy(insetrCss, getData, displayText) {
     runCopy = function () {
         copyStr = getData();
@@ -171,55 +291,6 @@ function insetrHtml(insetrCss, html, fun) {
             clearInterval(intervalId);
         }
     }, 1000)
-}
-
-function sendMsg(data) {
-    var TextMsg = "{'msgtype': 'text','text': {'content': 'textMsg'}}";
-    TextMsg = TextMsg.replace("textMsg", data);
-    GM_xmlhttpRequest({
-        method: "POST",
-        url: globalUserData["url"],
-        data: TextMsg,
-        headers: {
-            "Content-Type": "application/json ;charset=gbk "
-        },
-        onload: function (response) {
-            debug(response.responseText, 20)
-        }
-    });
-}
-
-function logPrint(logStr, level = 20, autoClose = 3) {
-    debug(logStr, level);
-    if(level < debugLevel){
-        return 0;
-    }
-    var div = document.getElementById("logPrint")
-    if (div == null) {
-        div = document.createElement("div");
-        div.id = "logPrint";
-        div.className = "container";
-    } else {
-        div.style.left = "50%";
-    }
-    if (level == 10) {
-        div.className = "alert alert-success alert-dismissible";
-    } else if (level == 20) {
-        div.className = "alert alert-info alert-dismissible";
-    } else if (level == 30) {
-        div.className = "alert alert-warning alert-dismissible";
-    } else if (level == 40) {
-        div.className = "alert alert-danger alert-dismissible";
-    } else {
-        div.className = "alert alert-primary alert-dismissible";
-    }
-    div.innerHTML = '<button onclick="this.parentNode.remove()" type="button" class="close" data-dismiss="alert">&times;</button>' + logStr;
-    document.body.append(div);
-    div.style.left = (div.offsetLeft - div.offsetWidth / 2) + "px";
-    if (autoClose) {
-        setTimeout(function () { div.style = "top:100%; opacity:0; transition: all 0.3s;"; }, autoClose * 1000);
-        setTimeout(function () { div.remove(); }, autoClose * 1000 + 300);
-    }
 }
 
 function getSkuCode(skuName) {
@@ -832,21 +903,6 @@ function getDataTrade() {
     logPrint("复制成功");
 };
 
-function toText(data) {
-    var dataStr = "";
-    for (var rowi = 0; rowi < data.length; rowi++) {
-        for (var coli = 0; coli < data[rowi].length; coli++) {
-            var tmp = String(data[rowi][coli]).replace('"', '""');
-            if (tmp.indexOf(",") >= 0 || tmp.indexOf('"') >= 0 || tmp.indexOf("\n") >= 0 || tmp.indexOf("\t") >= 0) {
-                tmp = '"' + tmp + '"';
-            }
-            dataStr += tmp + "\t";
-        }
-        dataStr = dataStr.trimEnd() + "\n";
-    }
-    return dataStr.trimEnd();
-}
-
 function getDYorder() {
     // 获取抖店订单管理数据
     var css = {};
@@ -908,30 +964,6 @@ function getDYorder() {
     GM_setClipboard(toTable(data));
     logPrint("复制成功");
 };
-
-// 查找父元素
-function findParentElementWithClass(element, targetClass) {
-    while (element && element !== document) {
-        if (element.classList && element.classList.contains(targetClass)) {
-            return element;
-        }
-        element = element.parentElement;
-    }
-    return null;
-}
-
-// 查找父元素
-function findFirstChildElement(element) {
-    while (element && element !== document) {
-        var firstChildElement = element.firstElementChild;
-        if (firstChildElement) {
-            element = firstChildElement;
-        } else {
-            return element;
-        }
-    }
-    return null;
-}
 
 function getERP321() {
     // 采购单
@@ -1112,36 +1144,6 @@ function makeOrder() {
             clearInterval(intervalId);
         }
     }, interval);
-}
-
-function waitClick(cssStr, newCssStr, timeOut = 2000) {
-    var begin = 0;
-    var interval = 200;
-    var intervalId = setInterval(function () {
-        if (typeof (newCssStr) == 'string') {
-            var node = document.querySelector(newCssStr);
-        } else {
-            var node = newCssStr;
-        }
-        if (node != null) {
-            clearInterval(intervalId);
-            return true;
-        } else {
-            if (typeof (cssStr) == 'string') {
-                var node = document.querySelector(cssStr);
-            } else {
-                var node = cssStr;
-            }
-            if (node != null) {
-                node.click();
-            }
-        }
-        begin += interval;
-        if (begin >= timeOut) {
-            clearInterval(intervalId);
-            return false;
-        }
-    }, interval)
 }
 
 function unshipped() {
