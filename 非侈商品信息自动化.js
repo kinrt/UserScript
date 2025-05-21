@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         非侈商品信息自动化
-// @version      2025/05/21
+// @version      20250521
 // @author       kinrt
 // @description  复制宝贝数据，快速复制各种信息，打开常用页面等。
 // @namespace    https://github.com/kinrt/userScript
