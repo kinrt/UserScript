@@ -1,0 +1,266 @@
+<html>
+
+<head>
+    <style type="text/css">
+        body {
+            margin: 0;
+            font-weight: 500 !important;
+            font-family: tahoma, arial, 'Hiragino Sans GB';
+            font-size: 12px !important;
+            color: #fff !important;
+        }
+
+        #logPanel {
+            position: fixed;
+            top: 20%;
+            width: auto;
+            min-width: 300px;
+            max-width: 30%;
+            height: auto;
+            min-height: 15%;
+            max-height: 50%;
+            opacity: 0.8;
+            background: #333 !important;
+            z-index: 2147483647 !important;
+            margin: 0;
+            transition: 0.3s;
+            overflow: auto;
+            padding: 5px 8px;
+            border-width: 1px 1px 1px 0;
+            border-bottom-right-radius: 5px;
+            border-top-right-radius: 5px;
+            box-sizing: content-box;
+        }
+
+        #logPanel #copyText {
+            position: absolute;
+            left: -99999px;
+        }
+
+        #copyLogBnt {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            user-select: none;
+        }
+
+        #downDataBnt {
+            position: absolute;
+            top: 15px;
+            right: 50px;
+            user-select: none;
+        }
+
+        #viewDataBnt {
+            position: absolute;
+            top: -150px;
+            right: 80px;
+            user-select: none;
+        }
+
+        #logPanel a {
+            opacity: 0.6 !important;
+        }
+
+        #logPanel a:hover {
+            text-decoration: none;
+            opacity: 1 !important;
+            cursor: pointer;
+        }
+
+        #tag {
+            display: none;
+        }
+
+        #head {
+            height: 45px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        #head h2 {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 2px;
+        }
+
+        #head span {
+            color: #999;
+        }
+
+        #list table {
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+
+        #list table td {
+            font-size: 12px !important;
+            padding: 2px;
+        }
+
+        #list table tr {
+            padding-bottom: 3px;
+        }
+
+        #logPanel::-webkit-scrollbar {
+            /*滚动条整体样式*/
+            width: 5px;
+            /*高宽分别对应横竖滚动条的尺寸*/
+            height: 1px;
+        }
+
+        #logPanel::-webkit-scrollbar-thumb {
+            /*滚动条里面小方块*/
+            border-radius: 5px;
+            -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            background: #666;
+        }
+
+        #logPanel::-webkit-scrollbar-track {
+            /*滚动条里面轨道*/
+            -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            background: #444;
+        }
+
+        .hide {
+            width: 10px !important;
+            min-width: 1px !important;
+            height: 35px !important;
+            min-height: 1px !important;
+            opacity: 0.1 !important;
+        }
+
+        .hide #tag {
+            display: block;
+        }
+
+        .hide #head {
+            display: none;
+        }
+
+        .hide #list {
+            display: none;
+        }
+
+        @font-face {
+            font-family: 'iconfont';
+            /* project id 845604 */
+            src: url('//at.alicdn.com/t/font_845604_qy7x08uy9n.eot');
+            src: url('//at.alicdn.com/t/font_845604_qy7x08uy9n.eot?#iefix') format('embedded-opentype'),
+                url('//at.alicdn.com/t/font_845604_qy7x08uy9n.woff2') format('woff2'),
+                url('//at.alicdn.com/t/font_845604_qy7x08uy9n.woff') format('woff'),
+                url('//at.alicdn.com/t/font_845604_qy7x08uy9n.ttf') format('truetype'),
+                url('//at.alicdn.com/t/font_845604_qy7x08uy9n.svg#iconfont') format('svg');
+        }
+
+        .iconfont {
+            font-family: 'iconfont' !important;
+            font-size: 16px;
+            font-style: normal;
+            -webkit-font-smoothing: antialiased;
+            -webkit-text-stroke-width: 0.2px;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="logPanel" class="hide">
+        <span id="tag">日志</span>
+        <div id="head">
+            <h2>Kinrt User Script日志</h2><span>淘宝搜索 页面基础数据统计</span>
+        </div>
+        <div id="list">
+            <table>
+                <tr>
+                    <td>10:04:40</td>
+                    <td> 发现【淘宝搜索】数据 数量：48</td>
+                </tr>
+                <tr>
+                    <td>10:04:40</td>
+                    <td> 价格 mean：151.46</td>
+                </tr>
+            </table>
+            <textarea id="copyText"></textarea>
+            <a id="copylogbnt" title="复制日志" class="iconfont">&#xe614;</a>
+            <a id="downdatabnt" title="下载数据" class="iconfont">&#xe603;</a>
+            <a id="viewdatabnt" title="显示数据" class="iconfont">&#xe600;</a>
+        </div>
+    </div>
+    <script>
+        copyLog = function () {
+            try {
+                document.getElementById("userScriptCopyText").select();
+                document.execCommand('copy');
+                console.log("复制成功");
+            } catch (err) {
+                console.log('复制失败');
+            }
+        }
+        downData = function () {
+            var dataStr = "";
+            for (var coli = 0; coli < settingData.dataCol.length; coli++) {
+                dataStr += settingData.dataCol[coli]["name"] + ",";
+            }
+            dataStr += "\n";
+            for (var rowi = 0; rowi < settingData.dataCol[0].data.length; rowi++) {
+                for (var coli = 0; coli < settingData.dataCol.length; coli++) {
+                    var tmp = String(settingData.dataCol[coli].data[rowi]).trim();
+                    tmp = tmp.replace('"', '""');
+                    if (tmp.indexOf(",") >= 0 || tmp.indexOf('"') >= 0 || tmp.indexOf("\n") >= 0) {
+                        tmp = '"' + tmp + '"';
+                    }
+                    dataStr += tmp + ",";
+                }
+                dataStr += "\n";
+            }
+            console.log(dataStr);
+            var csvData = new Blob(["\uFEFF" + dataStr], {
+                type: 'text/csv'
+            });
+            var csvUrl = URL.createObjectURL(csvData);
+            var a = document.createElement('a');
+            a.download = scriptName + new Date().Format("yyyy-MM-dd hhmmss") + '.csv';
+            a.href = csvUrl;
+            document.body.appendChild(a);
+            a.click();
+        }
+        viewData = function () {
+            console.log(settingData.dataCol);
+        }
+        show = function (showTime = 0) {
+            document.getElementById('logPanel').classList.remove("hide");
+            if (showTime > 0) {
+                setTimeout(function () {
+                    document.getElementById('logPanel').classList.add("hide");
+                }, showTime * 1000)
+            }
+        }
+        hide = function (showTime = 0.1) {
+            setTimeout(function () {
+                document.getElementById('logPanel').classList.add("hide");
+            }, showTime * 1000)
+        }
+        print = function (logStr) {
+            var log = document.createElement("tr");
+            log.innerHTML = "<td>" + new Date().Format("hh:mm:ss") + "</td><td>  " + logStr + "</td>";
+            this.logTable.appendChild(log);
+            this.copyText.innerHTML += logStr + "\n";
+        }
+        del = function (num = "all") {
+            if (num == "all") {
+                this.logTable.innerHTML = "";
+                this.copyText.innerHTML = "";
+            } else alert("功能没有完成。");
+        }
+        document.getElementById("copylogbnt").addEventListener("click", copyLog);
+        document.getElementById("downdatabnt").addEventListener("click", downData);
+        document.getElementById("viewdatabnt").addEventListener("click", viewData);
+        document.getElementById("logPanel").addEventListener("mouseover", show);
+        document.getElementById("logPanel").addEventListener("mouseleave", hide);
+    </script>
+</body>
+
+</html>
