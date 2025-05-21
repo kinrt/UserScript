@@ -1,9 +1,12 @@
 // ==UserScript==
-// @name         非侈商品信息自动填充
-// @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  商品信息自动填充
+// @name         非侈商品信息自动化
+// @version      2025/05/21
 // @author       kinrt
+// @description  复制宝贝数据，快速复制各种信息，打开常用页面等。
+// @namespace    https://github.com/kinrt/userScript
+// @updateURL    https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
+// @downloadURL  https://raw.githubusercontent.com/kinrt/userScript/main/淘宝工作辅助.js
+
 // @include      https://*.taobao.com/*
 // @include      https://*.tmall.com/*
 // @grant        GM_setValue
