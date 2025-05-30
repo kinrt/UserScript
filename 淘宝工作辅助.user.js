@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         淘宝工作辅助
-// @version      20250521
+// @version      20250530
 // @author       kinrt
 // @description  复制已售出的数据，复制宝贝数据，0库存改变颜色提醒，宝贝发布页面功能增强。快速复制各种信息，打开常用页面等。
 // @namespace    https://github.com/kinrt/userScript
@@ -173,6 +173,80 @@ function sizeof(str) {
     }
     return total;
 }
+
+function queryElements(contextNode, selector, elementIndex = 0) {
+    let elements = [];
+    if (selector.startsWith('xpath=')) {
+        // XPath 定位
+        const xpathExpression = selector.substring('xpath='.length);
+        const result = document.evaluate(xpathExpression, contextNode, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        for (let i = 0; i < result.snapshotLength; i++) {
+            elements.push(result.snapshotItem(i));
+        }
+    } else {
+        // CSS 选择器定位
+        elements = Array.from(contextNode.querySelectorAll(selector));
+    }
+
+    // 根据 elementIndex 返回指定的元素
+    if (elementIndex === 0) {
+        // 返回所有元素
+        return elements;
+    } else if (elementIndex > 0) {
+        // 返回指定索引的元素（从1开始计数）
+        if (elementIndex <= elements.length) {
+            return elements[elementIndex - 1];
+        } else {
+            console.log('索引超出范围');
+            return null;
+        }
+    } else if (elementIndex < 0) {
+        // 返回倒数指定索引的元素（从-1开始计数）
+        const absIndex = Math.abs(elementIndex);
+        if (absIndex <= elements.length) {
+            return elements[elements.length - absIndex];
+        } else {
+            console.log('索引超出范围');
+            return null;
+        }
+    }
+
+    return elements;
+}
+
+// 定义 Document 和 HTMLElement 的 getE 方法
+if (!Document.prototype.getE) {
+    Object.defineProperty(Document.prototype, 'getE', {
+        value: function (selector, elementIndex = 1) {
+            return queryElements(this, selector, elementIndex);
+        }
+    });
+}
+
+if (!HTMLElement.prototype.getE) {
+    Object.defineProperty(HTMLElement.prototype, 'getE', {
+        value: function (selector, elementIndex = 1) {
+            return queryElements(this, selector, elementIndex);
+        }
+    });
+}
+
+function getETest(){
+    // 测试 getE 方法
+    // 默认返回第一个元素
+    var container = document.getE('.main');
+    // 第二参数0表示返回所有元素
+    var elements = container.getE('xpath=//h3', 0);
+    // 第二参数-1表示返回最后一个元素
+    var elements = container.getE('xpath=//h3', -1);
+    // 第二参数3表示返回第三个元素
+    var elements = container.getE('xpath=//h3', 3);
+    // 返回H3元素中包含特定文本的元素
+    var elements = document.getE("xpath=//h3[contains(text(), '检查代码执行顺序')]");
+    // 返回class为chat-input-editor-container的div元素中包含特定文本的元素
+    var elements = document.getE("xpath=//div[@class='chat-input-editor-container']//*[contains(text(), '输入你的问题，帮你深度解答')]");
+}
+
 
 function toTable(data) {
     var dataStr = "<table>\n";
@@ -697,15 +771,15 @@ function sellItemsPage() {
     // 添加查看数据链接
     var intervalId = setInterval(function () {
         try {
-            if (document.querySelector(css["图标"]).innerHTML.indexOf("SYCM") < 0) {
-                var item = document.querySelectorAll(css["出售中宝贝"]);
+            if (document.getE(css["图标"]).innerHTML.indexOf("SYCM") < 0) {
+                var item = document.getE(css["出售中宝贝"], 0);
                 var itemDict = {};
                 for (i = 0; i < item.length; i++) {
-                    var itemID = item[i].querySelector(css["宝贝ID"]).innerText.slice(3, 18);
-                    var image = item[i].querySelector(css["图片"]);
-                    var code = item[i].querySelector(css["编码"]);
-                    var time = item[i].querySelector(css["创建时间"]);
-                    var itemIco = item[i].querySelector(css["图标"]);
+                    var itemID = item[i].getE(css["宝贝ID"]).innerText.slice(3, 18);
+                    var image = item[i].getE(css["图片"]);
+                    var code = item[i].getE(css["编码"]);
+                    var time = item[i].getE(css["创建时间"]);
+                    var itemIco = item[i].getE(css["图标"]);
                     itemDict[itemID] = {};
                     itemDict[itemID]["ID"] = itemID
                     try {
@@ -721,7 +795,7 @@ function sellItemsPage() {
                     var sousuo = "&nbsp;&nbsp;<a target='_blank' class='table-hover-show' href='https://sycm.taobao.com/flow/monitor/itemsourcedetail?belong=all&childPageType=se_keyword&dateType=recent30&device=2&jumpCalcModel=holoTree&pPageId=30&pageId=23.s1150&pageLevel=2&pageName=%E6%89%8B%E6%B7%98%E6%90%9C%E7%B4%A2&itemId=" + itemID + "'>搜索来源</a>";
                     var copyStr = "&nbsp;&nbsp;<a class='copyStr table-hover-show' href='javascript:void(0);' itemID='" + itemID + "'>复制</a>";
                     itemIco.innerHTML = itemIco.innerHTML + sycm + sousuo + dmp + copyStr;
-                    itemIco.querySelector("a.copyStr").addEventListener("click", function(event) {
+                    itemIco.getE("a.copyStr").addEventListener("click", function(event) {
                         const target = event.target;
                         itemID = target.getAttribute("itemID");
                         data = itemDict[itemID]["ID"] + "\t" +itemDict[itemID]["时间"] + "\t" +itemDict[itemID]["编码"] + "\t" +itemDict[itemID]["图片"]
