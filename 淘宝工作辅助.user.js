@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         淘宝工作辅助
-// @version      20250530
+// @version      20250604
 // @author       kinrt
 // @description  复制已售出的数据，复制宝贝数据，0库存改变颜色提醒，宝贝发布页面功能增强。快速复制各种信息，打开常用页面等。
 // @namespace    https://github.com/kinrt/userScript
@@ -95,7 +95,7 @@ function debug(data, level = LOG_LEVELS.INFO) {
 
 function logPrint(logStr, level = 20, autoClose = 3) {
     debug(logStr, level);
-    if(level < debugLevel){
+    if (level < debugLevel) {
         return 0;
     }
     var div = document.getElementById("logPrint")
@@ -176,10 +176,9 @@ function sizeof(str) {
 
 function queryElements(contextNode, selector, elementIndex = 0) {
     let elements = [];
-    if (selector.startsWith('xpath=')) {
+    if (selector.startsWith('//')) {
         // XPath 定位
-        const xpathExpression = selector.substring('xpath='.length);
-        const result = document.evaluate(xpathExpression, contextNode, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        const result = document.evaluate(selector, contextNode, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         for (let i = 0; i < result.snapshotLength; i++) {
             elements.push(result.snapshotItem(i));
         }
@@ -231,22 +230,112 @@ if (!HTMLElement.prototype.getE) {
     });
 }
 
-function getETest(){
-    // 测试 getE 方法
+// 测试 getE 方法
+function getETest() {
     // 默认返回第一个元素
     var container = document.getE('.main');
     // 第二参数0表示返回所有元素
-    var elements = container.getE('xpath=//h3', 0);
+    var elements = container.getE('//h3', 0);
     // 第二参数-1表示返回最后一个元素
-    var elements = container.getE('xpath=//h3', -1);
+    var elements = container.getE('//h3', -1);
     // 第二参数3表示返回第三个元素
-    var elements = container.getE('xpath=//h3', 3);
+    var elements = container.getE('//h3', 3);
     // 返回H3元素中包含特定文本的元素
-    var elements = document.getE("xpath=//h3[contains(text(), '检查代码执行顺序')]");
+    var elements = document.getE("//h3[contains(text(), '检查代码执行顺序')]");
     // 返回class为chat-input-editor-container的div元素中包含特定文本的元素
-    var elements = document.getE("xpath=//div[@class='chat-input-editor-container']//*[contains(text(), '输入你的问题，帮你深度解答')]");
+    var elements = document.getE("//div[@class='chat-input-editor-container']//*[contains(text(), '输入你的问题，帮你深度解答')]");
 }
 
+// 等待元素出现
+function waitForElement(selector, timeout = 5000) {
+    return new Promise(resolve => {
+        const startTime = Date.now();
+        const check = () => {
+            const el = document.getE(selector, 1);
+            if (el) return resolve(el);
+            if (Date.now() - startTime > timeout) return resolve(null);
+            setTimeout(check, 200);
+        };
+        check();
+    });
+};
+
+function waitForAndClickElement(contextNode, selectorOrXpath = "", timeout = 5000, delay = 1000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        const pollInterval = 100; // 轮询间隔(毫秒)
+
+        const poll = setInterval(() => {
+            // 使用现有的 queryElements 函数查找元素
+            if (selectorOrXpath == "") var element = contextNode;
+            else var element = queryElements(contextNode, selectorOrXpath, 1);
+
+            if (element) {
+                clearInterval(poll);
+                try {
+                    // 执行点击操作
+                    element.click();
+                    // 点击后等待指定的延迟时间
+                    setTimeout(() => {
+                        resolve(element); // 返回被点击的元素
+                    }, delay);
+                } catch (error) {
+                    reject(`点击元素失败: ${error}`);
+                }
+            }
+            // 检查是否超时
+            else if (Date.now() - startTime >= timeout) {
+                clearInterval(poll);
+                reject(`等待元素超时: ${selectorOrXpath}`);
+            }
+        }, pollInterval);
+    });
+}
+
+// 定义 Document 的 clickW 方法
+if (!Document.prototype.clickW) {
+    Object.defineProperty(Document.prototype, 'clickW', {
+        value: function (selectorOrXpath = "", timeout = 5000, delay = 1000) {
+            return waitForAndClickElement(this, selectorOrXpath, timeout, delay);
+        }
+    });
+}
+
+// 定义 HTMLElement 的 clickW 方法
+if (!HTMLElement.prototype.clickW) {
+    Object.defineProperty(HTMLElement.prototype, 'clickW', {
+        value: function (selectorOrXpath = "", timeout = 5000, delay = 1000) {
+            return waitForAndClickElement(this, selectorOrXpath, timeout, delay);
+        }
+    });
+}
+
+//  测试clickW效果
+//  测试页面：https://myseller.taobao.com/home.htm/qn-order/unshipped?from_channel=dadangongju
+//  使用异步循环实现延迟
+clickAllCheckboxes = async function () {
+    const items = document.getE("div.table-medium tbody tr.art-table-row", 0);
+    for (let i = 0; i < items.length; i++) {
+        await items[i].clickW("td.art-table-cell input", 3000, 1000);
+    }
+    return items.length; // 返回点击的数量
+};
+
+// 使用递归函数实现延迟
+function clickCheckboxesSequentially(index = 0) {
+    const items = document.getE("div.table-medium tbody tr.art-table-row", 0);
+    if (index >= items.length) return;
+
+    items[index].clickW("td.art-table-cell input", 3000, 1000)
+        .then(() => {
+            // 延迟100ms后继续下一个（可选）
+            setTimeout(() => clickCheckboxesSequentially(index + 1), 100);
+        })
+        .catch(error => {
+            console.error(`第 ${index + 1} 项点击失败:`, error);
+            clickCheckboxesSequentially(index + 1); // 继续下一个
+        });
+}
 
 function toTable(data) {
     var dataStr = "<table>\n";
@@ -291,7 +380,7 @@ function findParentElementWithClass(element, targetClass) {
     return null;
 }
 
-// 查找第一个元素
+// 查找第一个子元素
 function findFirstChildElement(element) {
     while (element && element !== document) {
         var firstChildElement = element.firstElementChild;
@@ -302,37 +391,6 @@ function findFirstChildElement(element) {
         }
     }
     return null;
-}
-
-// 等到指定元素后点击
-function waitClick(cssStr, newCssStr, timeOut = 2000) {
-    var begin = 0;
-    var interval = 200;
-    var intervalId = setInterval(function () {
-        if (typeof (newCssStr) == 'string') {
-            var node = document.querySelector(newCssStr);
-        } else {
-            var node = newCssStr;
-        }
-        if (node != null) {
-            clearInterval(intervalId);
-            return true;
-        } else {
-            if (typeof (cssStr) == 'string') {
-                var node = document.querySelector(cssStr);
-            } else {
-                var node = cssStr;
-            }
-            if (node != null) {
-                node.click();
-            }
-        }
-        begin += interval;
-        if (begin >= timeOut) {
-            clearInterval(intervalId);
-            return false;
-        }
-    }, interval)
 }
 
 function insetrCopy(insetrCss, getData, displayText) {
@@ -786,7 +844,7 @@ function sellItemsPage() {
                         itemDict[itemID]["编码"] = code.innerText.slice(3, 18);
                     }
                     catch {
-                        itemDict[itemID]["编码"] =  "";
+                        itemDict[itemID]["编码"] = "";
                     }
                     itemDict[itemID]["图片"] = "https:" + image.getAttribute("src").split(".jpg")[0] + ".jpg";
                     itemDict[itemID]["时间"] = time.innerText.replace(/-/g, "/",).replace(/ \S+/, "");
@@ -795,10 +853,10 @@ function sellItemsPage() {
                     var sousuo = "&nbsp;&nbsp;<a target='_blank' class='table-hover-show' href='https://sycm.taobao.com/flow/monitor/itemsourcedetail?belong=all&childPageType=se_keyword&dateType=recent30&device=2&jumpCalcModel=holoTree&pPageId=30&pageId=23.s1150&pageLevel=2&pageName=%E6%89%8B%E6%B7%98%E6%90%9C%E7%B4%A2&itemId=" + itemID + "'>搜索来源</a>";
                     var copyStr = "&nbsp;&nbsp;<a class='copyStr table-hover-show' href='javascript:void(0);' itemID='" + itemID + "'>复制</a>";
                     itemIco.innerHTML = itemIco.innerHTML + sycm + sousuo + dmp + copyStr;
-                    itemIco.getE("a.copyStr").addEventListener("click", function(event) {
+                    itemIco.getE("a.copyStr").addEventListener("click", function (event) {
                         const target = event.target;
                         itemID = target.getAttribute("itemID");
-                        data = itemDict[itemID]["ID"] + "\t" +itemDict[itemID]["时间"] + "\t" +itemDict[itemID]["编码"] + "\t" +itemDict[itemID]["图片"]
+                        data = itemDict[itemID]["ID"] + "\t" + itemDict[itemID]["时间"] + "\t" + itemDict[itemID]["编码"] + "\t" + itemDict[itemID]["图片"]
                         GM_setClipboard(data);
                         logPrint("复制成功:" + data);
                     });
@@ -828,11 +886,11 @@ function inventoryEdit() {
         debug("关闭");
         skuDict = {};
         allSKU = [];
-        document.querySelector(css["编辑库存或价格取消按钮"]).click();
+        document.clickW(css["编辑库存或价格取消按钮"]);
     }
     function submitF() {
         debug("提交");
-        document.querySelector(css["编辑库存或价格标题"]).click();
+        document.clickW(css["编辑库存或价格标题"]);
         var title = document.querySelector(css["编辑库存或价格标题"]).innerText;
         var itemId = document.querySelector(css["商品ID"]).innerText;
         logPrint(title + " " + itemId);
@@ -1045,7 +1103,7 @@ function getERP321() {
     css["标题栏"] = "div#_jt_row_head_list div._jt_cell_head";
     css["选择的数据"] = "div#_jt_body_list div._jt_row_current div._jt_ch";
     // 监听鼠标点击事件
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', function (event) {
         const target = event.target;
         const current = findParentElementWithClass(target, '_jt_row_current');
         // 检查点击的元素是否是可以读取的数据
@@ -1063,24 +1121,24 @@ function getERP321() {
                 }
                 else if (tagName == "INPUT") {
                     itemDict[headStr] = firstChildElement.value;
-                }else{
+                } else {
                     itemDict[headStr] = firstChildElement.textContent;
                 }
             }
-            if(itemDict.hasOwnProperty("采购单号")){
+            if (itemDict.hasOwnProperty("采购单号")) {
                 // 没有数据就初始化
-                if(itemDict["状态"] == "待审核"){
+                if (itemDict["状态"] == "待审核") {
                     // 没有数据就初始化
                     logPrint("选择采购单：" + itemDict["采购单号"] + " 待审核！", 40);
-                }else{
+                } else {
                     logPrint("选择采购单：" + itemDict["采购单号"]);
                 }
-            }else{
-                if(itemDict["颜色及规格"].includes(itemDict["商品编码"]) == false){
+            } else {
+                if (itemDict["颜色及规格"].includes(itemDict["商品编码"]) == false) {
                     // 没有商品编码的添加
                     itemDict["颜色及规格"] = itemDict["商品编码"] + " " + itemDict["颜色及规格"]
                     logPrint("复制数据：" + itemDict["颜色及规格"] + "——颜色及规格不含商品编码：" + itemDict["商品编码"] + " 建议修改。", 30, 8);
-                }else{
+                } else {
                     logPrint("复制数据：" + itemDict["颜色及规格"]);
                 }
             }
@@ -1097,7 +1155,7 @@ function getERP321ShangPin() {
     css["标题栏"] = "div.art-loading-wrapper div.art-table-header th";
     css["选择的数据"] = "div.art-loading-wrapper div.art-table-body tr.art-table-row.highlight > td";
     // 监听鼠标点击事件
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', function (event) {
         const target = event.target;
         const highlight = findParentElementWithClass(target, 'highlight');
         // 检查点击的元素是否是商家编码输入框
@@ -1115,11 +1173,11 @@ function getERP321ShangPin() {
                 }
                 else if (tagName == "INPUT") {
                     itemDict[headStr] = firstChildElement.value;
-                }else{
+                } else {
                     itemDict[headStr] = firstChildElement.textContent;
                 }
             }
-            if(itemDict["颜色及规格"].includes(itemDict["商品编码"]) == false){
+            if (itemDict["颜色及规格"].includes(itemDict["商品编码"]) == false) {
                 // 没有商品编码的添加
                 logPrint(itemDict["颜色及规格"] + "——颜色及规格不含商品编码：" + itemDict["商品编码"] + " 建议修改。", 30, 8);
                 itemDict["颜色及规格"] = itemDict["商品编码"] + " " + itemDict["颜色及规格"]
@@ -1151,247 +1209,156 @@ function getData1688Trade() {
     return toTable(data);
 };
 
-function makeOrder() {
-    // https://market.m.taobao.com/app/cnmerchant/delivery-center/index.html#/home
-    var css = {};
-    // 菜鸟发货 打单页面
-    css["发货订单"] = "div.order_item_container";
-    css["复选框"] = "div.main_order_item input.ant-checkbox-input";
-    css["锁定"] = "div.main_order_item span.operation_item:nth-child(2)";
-    css["SKU模块"] = "div.sku_container";
-    css["打印快递单"] = "div[class*=footer_button_option] button[class*=primaryBtn]";
-    css["自动发货勾选状态"] = "div.ant-modal-body span.ant-checkbox-checked > input";
-    css["自动发货"] = "div.ant-modal-body span.ant-checkbox > input";
-    css["取消打印"] = "div.ant-modal-content button.ant-btn.ant-btn-lg";
-    css["确认打印"] = "div.ant-modal-content button.ant-btn.ant-btn-primary.ant-btn-lg";
-    css["错误内容"] = "div.ant-modal-content div.ant-modal-confirm-content > span";
-    css["错误按钮"] = "div.ant-modal-content div.ant-modal-confirm-btns > button.ant-btn-primary";
-    css["提示按钮"] = "div.ant-modal-root button.ant-btn.ant-btn-primary";
-    var interval = 3000;
-    var intervalId = setInterval(function () {
-        try {
-            document.querySelector(css["提示按钮"]).click();
-        }
-        catch (e) {
-            debug(e)
-        }
-        var items = document.querySelectorAll(css["发货订单"]);
-        var itemDict = {};
-        var itemList = [];
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].querySelector(css["复选框"]) != null) {
-                var sku = "";
-                var skuObj = items[i].querySelectorAll(css["SKU模块"]);
-                for (x in skuObj) {
-                    sku += skuObj[x].innerText;
-                }
-                sku = getSkuCode(sku);
-                if (sku == "") { sku = "" + i }
-                itemDict[sku] = i;
-                itemList.push(sku);
-            }
-        }
-        itemList.sort()
-        if (itemList.length > 0) {
-            sku = itemList.shift();
-            debug("点击" + sku);
-            items[itemDict[sku]].querySelector(css["复选框"]).click();
-            document.querySelector(css["打印快递单"]).click();
-            setTimeout(function () {
-                if (null == document.querySelector(css["自动发货勾选状态"])) {
-                    document.querySelector(css["自动发货"]).click();
-                }
-                document.querySelector(css["确认打印"]).click();
-            }, 500);
-            setTimeout(function () {
-                var err = document.querySelector(css["错误按钮"]);
-                if (err != null) {
-                    sendMsg(document.querySelector(css["错误内容"]).innerText);
-                    err.click();
-                    setTimeout(function () {
-                        document.querySelector(css["取消打印"]).click();
-                        items[itemDict[sku]].querySelector(css["锁定"]).click();
-                    }, 1500);
-                }
-            }, 1000);
-        } else {
-            clearInterval(intervalId);
-        }
-    }, interval);
-}
-
-function unshipped() {
+async function unshipped() {
     // https://myseller.taobao.com/home.htm/qn-order/unshipped
-    var css = {};
-    css["th"] = "div.table-medium thead th .forHeaderWidth";
-    css["tr"] = "div.table-medium tbody tr.art-table-row";
-    css["td"] = "td.art-table-cell";
+    const css = {
+        "th": "div.table-medium thead th .forHeaderWidth",
+        "tr": "div.table-medium tbody tr.art-table-row",
+        "td": "td.art-table-cell",
+        "复选框": "td.art-table-cell input",
+        "锁定": "i.next-icon-lock.next-icon-alone",
+        "打印快递单": "div[class*=BottomButtons_btn__] > button",
+        "打印成功后自动发货": "div[role=dialog] input.next-checkbox-input",
+        "取消打印": "div[role=dialog] i.next-icon-close",
+        "开始打印": "div[role=dialog] div[class*=PrintDialog_splitButton__] > button",
+        "打印状态": "div[role=dialog] div[class*=PrintHandle_title__]",
+        "错误内容": "div[class*=PrintingList_common] div[aria-hidden=false] span[class*=PrintingList_ellipsis]",
+        "提示按钮": "div.ant-modal-root button.ant-btn.ant-btn-primary",
+        "关闭弹窗": "div[class*=activity_remind_modal] div[class*=close]"
+    };
 
-    css["复选框"] = "td.art-table-cell input";
-    css["锁定"] = "i.next-icon-lock.next-icon-alone";
-    // css["订单号"] = "td[name=订单号] span";
-    // css["商品信息"] = "td[name=商品信息]";
-    // css["快递信息"] = "td[name=快递信息]";
-    // css["付款时间"] = "td[name=付款时间] > div > div > span";
-    css["打印快递单"] = "div[class*=BottomButtons_btn__] > button";
-    css["打印成功后自动发货"] = "div[role=dialog] input.next-checkbox-input";
-    css["取消打印"] = "div[role=dialog] i.next-icon-close";
-    css["开始打印"] = "div[role=dialog] div[class*=PrintDialog_splitButton__] > button";
+    const orderDict = {};
+    const skuList = [];
+    const thDict = {};
+    let printed = 0;
 
-    css["打印状态"] = "div[role=dialog] div[class*=PrintHandle_title__]";
-
-    css["错误内容"] = "div[class*=PrintingList_common] div[aria-hidden=false] span[class*=PrintingList_ellipsis]";
-    css["提示按钮"] = "div.ant-modal-root button.ant-btn.ant-btn-primary";
-    css["关闭弹窗"] = "div[class*=activity_remind_modal] div[class*=close]";
-    var interval = 2000;
-    var intervalId;
-    var order;
-    var thDict = {};
-    var orderDict = {};
-    var skuList = [];
-    var fun = {};
-    var printed = 0;
-
-    fun["获取订单"] = function () {
-        // 统计表头数据
-        var ths = document.querySelectorAll(css["th"]);
-        for (var i = 0; i < ths.length; i++) {
-            var thName = ths[i].getAttribute("data-name");
+    // 获取订单信息
+    const fetchOrders = async () => {
+        const ths = document.getE(css["th"], 0);
+        for (let i = 0; i < ths.length; i++) {
+            const thName = ths[i].getAttribute("data-name");
             thDict[thName] = i + 1;
         }
 
-        var items = document.querySelectorAll(css["tr"]);
-        for (var i = 0; i < items.length; i++) {
-            skuName = items[i].querySelectorAll(css["td"])[thDict["商品信息"]].innerText;
-            order = items[i].querySelectorAll(css["td"])[thDict["订单号"]].innerText.trim();
-            orderDict[order] = {};
-            orderDict[order]["状态"] = "未打印";
-            orderDict[order]["商品信息"] = skuName;
-            orderDict[order]["SKU"] = getSkuCode(orderDict[order]["商品信息"]);
-            if (orderDict[order]["SKU"] == "") { orderDict[order]["SKU"] = "" + i }
-            orderDict[order]["快递信息"] = items[i].querySelectorAll(css["td"])[thDict["快递信息"]].innerText;
-            skuList.push(orderDict[order]["SKU"]);
-            // if (items[i].querySelector(css["锁定"]) != null) {
-            //     orderDict[order]["锁定"] = false;
-            // } else {
-            //     orderDict[order]["锁定"] = true;
-            // }
-            // if (orderDict[order]["锁定"] == false && orderDict[order]["快递信息"] == '-') {
-            //     skuList.push(orderDict[order]["SKU"]);
-            // }
-        }
-        logPrint("找到订单：" + i + "个，即将排序打印。");
-        skuList.sort();
-    }
+        const items = document.getE(css["tr"], 0);
+        for (let i = 0; i < items.length; i++) {
+            const tds = items[i].getE(css["td"], 0);
+            const skuName = tds[thDict["商品信息"]]?.innerText || "";
+            const order = tds[thDict["订单号"]]?.innerText.trim() || `order_${Date.now()}_${i}`;
 
-    fun["检查订单"] = function () {
-        var noSku = true;
-        for (order in orderDict) {
-            if (orderDict[order]["SKU"] != "") {
-                noSku = false;
-            }
+            orderDict[order] = {
+                "状态": "未打印",
+                "商品信息": skuName,
+                "SKU": getSkuCode(skuName) || `sku_${i}`,
+                "快递信息": tds[thDict["快递信息"]]?.innerText || "-"
+            };
+
+            skuList.push(orderDict[order]["SKU"]);
         }
-        if (noSku) {
+
+        logPrint(`找到订单：${items.length}个，即将排序打印。`);
+        skuList.sort();
+    };
+
+    // 检查订单有效性
+    const checkOrders = () => {
+        const hasValidSKU = Object.values(orderDict).some(item => item.SKU !== "");
+        if (!hasValidSKU) {
             logPrint("找不商品编码，自动退出！", 40);
             return false;
         }
-    }
+        return true;
+    };
 
-    fun["选择订单"] = function () {
-        for (order_ in orderDict) {
-            if (orderDict[order_]["SKU"] == skuList[0] && orderDict[order_]["状态"] == "未打印") {
-                logPrint("选择编号：" + skuList[0] + orderDict[order_]["状态"]);
-                order = order_;
-                break;
-            }
-        }
-        var items = document.querySelectorAll(css["tr"]);
-        for (var i = 0; i < items.length; i++) {
+    // 主处理逻辑
+    const processOrders = async () => {
+        for (const sku of skuList) {
+            const orderEntry = Object.entries(orderDict).find(
+                ([_, data]) => data.SKU === sku && data.状态 === "未打印"
+            );
+
+            if (!orderEntry) continue;
+
+            const [order, orderData] = orderEntry;
+            logPrint(`处理订单：${order} | SKU: ${sku}`);
+
             try {
-                if (order == items[i].querySelectorAll(css["td"])[thDict["订单号"]].innerText.trim()) {
-                    items[i].querySelector(css["复选框"]).click();
-                } else {
-                    if (items[i].querySelector(css["复选框"]).getAttribute("aria-checked") == "true") {
-                        // 不应该选中的订单，取消选择状态
-                        items[i].querySelector(css["复选框"]).click();
-                    }
-                }
-            } catch (error) {
-                logPrint("error：" + error);
-            }
-        }
-        if (orderDict[order]["状态"] == "未打印") {
-            setTimeout(function () {
-                document.querySelector(css["打印快递单"]).click();
-            }, interval * 0.1);
-            // orderDict[order]["状态"] = "选择订单";
-            setTimeout(function () {
-                if (document.querySelector(css["开始打印"]) != null) {
-                    orderDict[order]["状态"] = "选择订单";
-                    logPrint("选择订单：" + order);
-                } else {
-                    orderDict[order]["状态"] = "未打印";
-                }
-            }, interval * 0.3);
-        }
+                // 1. 选择订单
+                const items = document.getE(css["tr"], 0);
+                for (const item of items) {
+                    const tds = item.getE(css["td"], 0);
+                    const itemOrder = tds[thDict["订单号"]]?.innerText.trim();
+                    const checkbox = item.getE(css["复选框"], 1);
 
-    }
-
-    fun["确认打印"] = function () {
-        if (orderDict[order]["状态"] == "选择订单") {
-            var autoConsign = document.querySelector(css["打印成功后自动发货"])
-            if (autoConsign != null) {
-                // if (autoConsign.getAttribute("aria-checked") == 'true') {
-                if (autoConsign.getAttribute("aria-checked") == 'false') {  // 勾选自动发货
-                    autoConsign.click();
-                }
-                document.querySelector(css["开始打印"]).click();
-                // orderDict[order]["状态"] = "确认打印";
-                setTimeout(function () {
-                    if (document.querySelector(css["开始打印"]) == null) {
-                        orderDict[order]["状态"] = "确认打印";
-                        logPrint("确认打印：" + order);
+                    if (itemOrder === order) {
+                        if (checkbox?.getAttribute("aria-checked") !== "true") {
+                            await checkbox.clickW();
+                        }
                     } else {
-                        orderDict[order]["状态"] = "选择订单";
+                        if (checkbox?.getAttribute("aria-checked") === "true") {
+                            await checkbox.clickW();
+                        }
                     }
-                }, interval * 0.6);
+                }
+
+                // 2. 点击打印按钮
+                await document.clickW(css["打印快递单"]);
+
+                // 3. 勾选自动发货
+                const autoConsign = await waitForElement(css["打印成功后自动发货"], 3000);
+                if (autoConsign?.getAttribute("aria-checked") === "false") {
+                    await autoConsign.clickW(css["打印成功后自动发货"], 1000);
+                }
+
+                // 4. 开始打印
+                await document.clickW(css["开始打印"]);
+
+                // 5. 检查打印状态
+                const checkStatus = async () => {
+                    const statusEl = document.getE(css["打印状态"], 1);
+                    if (!statusEl) {
+                        orderData.状态 = "成功";
+                        printed++;
+                        return true;
+                    }
+                    logPrint(`打印状态：${statusEl.innerText}`);
+                    return false;
+                };
+
+                // 等待打印完成（最多30秒）
+                const startTime = Date.now();
+                while (Date.now() - startTime < 30000) {
+                    if (await checkStatus()) break;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                // 6. 关闭弹窗（如果有）
+                const closeBtn = document.getE(css["取消打印"], 1) ||
+                    document.getE(css["关闭弹窗"], 1);
+                if (closeBtn) {
+                    await closeBtn.clickW();
+                }
+
+            } catch (error) {
+                logPrint(`订单处理失败 [${order}]: ${error.message}`, 40);
+                orderData.状态 = "失败";
             }
         }
-    }
 
-    fun["确认打印状态"] = function () {
-        if (orderDict[order]["状态"] == "确认打印") {
-            var printRet = document.querySelector(css["打印状态"]);
-            if (printRet == null) {
-                orderDict[order]["状态"] = "成功"
-                printed = printed + 1;
-            } else {
-                logPrint("打印状态：" + printRet.innerText);
-            }
-        }
-    }
+        // 完成处理
+        logPrint(`${globalUserData["user"]}批量排序打印完成，成功: ${printed}/${skuList.length}`);
+        sendMsg(`${globalUserData["user"]}批量排序打印订单：${printed}`);
+    };
 
-    fun["打印完成"] = function () {
-        if (orderDict[order]["状态"] == "成功" || orderDict[order]["状态"] == "失败") {
-            sku = skuList.shift();
-            if (skuList.length == 0) {
-                logPrint(globalUserData["user"] + "批量排序打印订单：" + printed);
-                sendMsg(globalUserData["user"] + "批量排序打印订单：" + printed);
-                clearInterval(intervalId);
-            }
-        }
+    // 执行主流程
+    try {
+        await fetchOrders();
+        if (!checkOrders()) return;
+        await processOrders();
+    } catch (error) {
+        logPrint(`处理流程出错: ${error.message}`, 40);
     }
-
-    fun["获取订单"]();
-    fun["检查订单"]();
-    intervalId = setInterval(function () {
-        fun["选择订单"]();
-        fun["确认打印"]();
-        fun["确认打印状态"]();
-        fun["打印完成"]();
-    }, interval)
 }
-
 
 function setCampaign() {
     var css = {};
@@ -1430,13 +1397,13 @@ function refund() {
     }, 300);
 }
 
-function openItemLink(URL){
+function openItemLink(URL) {
     setInterval(function () {
         var warnning = document.querySelector("div.warnning-text");
-        if(warnning != null && warnning.innerText.includes("非本店商品请前往千牛客户端访问")){
+        if (warnning != null && warnning.innerText.includes("非本店商品请前往千牛客户端访问")) {
             setGlobalUserData("非本店商品访问拦截", true);
-        }else{
-            if(URL.includes("item.htm?") && getGlobalUserData("非本店商品访问拦截")){
+        } else {
+            if (URL.includes("item.htm?") && getGlobalUserData("非本店商品访问拦截")) {
                 setGlobalUserData("非本店商品访问拦截", false);
                 logPrint("非本店商品访问拦截，使用强制打开模式，谨慎使用。", 30)
                 setTimeout(function () {
@@ -1879,24 +1846,24 @@ button.close {
 GM_addStyle(bootstrapcss);
 var stylewarn = " background-color:#ffc107; color: #212529; font-weight:700; border-radius: 0.25rem; ";
 
-function getGlobalUserData(key=null){
+function getGlobalUserData(key = null) {
     userScriptName = GM_info.script.name;
     globalUserData = GM_getValue(userScriptName) || {}; // 读取已存储数据
-    if(key==null){
+    if (key == null) {
         return globalUserData;
-    }else{
+    } else {
         return globalUserData[key];
     }
 
 }
 
-function setGlobalUserData(key, value, set=0){
+function setGlobalUserData(key, value, set = 0) {
     globalUserData = getGlobalUserData();
-    if(set == 0){
+    if (set == 0) {
         globalUserData[key] = value;
-    }else{
+    } else {
         // 字典更新模式
-        if(! globalUserData.hasOwnProperty(key)){
+        if (!globalUserData.hasOwnProperty(key)) {
             // 没有数据就初始化
             globalUserData[key] = {};
         }
@@ -1959,15 +1926,6 @@ setInterval(function () {
         // 活动报名页面
         setCampaign();
     }
-    if (URL.indexOf("https://fahuo.cainiao.com/consigns/order/consign.htm") != -1) {
-        // 菜鸟发货
-        var cssStr = "div[class*=footer_button_option] > div[class*=button_list]";
-        var html = '<div><button type="button" class="ant-btn buttonStyle___K0ulF" style="background-color: #28a745;color: #fff"><div class="text">排序打印</div></button></div>'
-        setTimeout(function () {
-            insetrHtml(cssStr, html, makeOrder);
-            document.querySelector("div[class*=activity_remind_modal] div[class*=close]").click();
-        }, 2000);
-    }
     if (URL.indexOf(".taobao.com/home.htm/qn-order/unshipped") != -1) {
         // 物流 打单工具
         ToolsPanel("排序打印", unshipped);
@@ -2020,7 +1978,7 @@ setInterval(function () {
         getERP321();
         getERP321ShangPin();
     }
-    if (URL.indexOf("https://item.taobao.com/item.htm") != -1 || URL.indexOf("https://detail.tmall.com/item.htm") != -1 || URL.indexOf("https://bixi.alicdn.com/punish/punish") != -1 ) {
+    if (URL.indexOf("https://item.taobao.com/item.htm") != -1 || URL.indexOf("https://detail.tmall.com/item.htm") != -1 || URL.indexOf("https://bixi.alicdn.com/punish/punish") != -1) {
         // 打开淘宝商品页面
         openItemLink(window.location.href);
     }
