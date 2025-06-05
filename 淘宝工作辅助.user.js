@@ -1280,7 +1280,7 @@ async function unshipped() {
             if (!orderEntry) continue;
 
             const [order, orderData] = orderEntry;
-            logPrint(`处理订单：${order} | SKU: ${sku}`);
+            logPrint(`${printed}/${skuList.length} 处理订单：${order} | SKU: ${sku}`);
 
             try {
                 // 1. 选择订单
@@ -1347,7 +1347,7 @@ async function unshipped() {
 
         // 完成处理
         logPrint(`${globalUserData["user"]}批量排序打印完成，成功: ${printed}/${skuList.length}`);
-        sendMsg(`${globalUserData["user"]}批量排序打印订单：${printed}`);
+        sendMsg(`${globalUserData["user"]}批量排序打印完成，成功:${printed}/${skuList.length}`);
     };
 
     // 执行主流程
